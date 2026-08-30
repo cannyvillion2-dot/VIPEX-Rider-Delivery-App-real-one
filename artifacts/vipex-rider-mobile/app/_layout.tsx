@@ -39,10 +39,9 @@ function RootLayoutNav() {
       <Stack.Screen
         name="subscription"
         options={{
-          presentation: 'formSheet',
-          sheetAllowedDetents: [0.72, 1],
-          sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          presentation: 'card',
+          animation: 'slide_from_bottom',
+          headerShown: false,
         }}
       />
     </Stack>

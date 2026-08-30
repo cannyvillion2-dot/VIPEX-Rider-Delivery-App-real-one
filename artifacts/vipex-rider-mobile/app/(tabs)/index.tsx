@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { useAuth } from '@/context/AuthContext';
 
 const logo = require('@/assets/images/vipex-logo.jpeg');
 
@@ -85,6 +86,7 @@ export default function HomeScreen() {
   const [isOnline, setIsOnline] = useState(true);
   const [delivered, setDelivered] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const markDelivered = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -105,7 +107,7 @@ export default function HomeScreen() {
           <Image source={logo} style={styles.logo} />
           <View style={styles.greeting}>
             <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>TUESDAY · 18 JUNE</Text>
-            <Text style={[styles.title, { color: colors.foreground }]}>Good morning, Kwame</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>Good morning, {user?.name?.split(' ')[0] || 'Rider'}</Text>
           </View>
           <Pressable
             style={[styles.bellButton, { backgroundColor: colors.card, borderColor: colors.border }]}

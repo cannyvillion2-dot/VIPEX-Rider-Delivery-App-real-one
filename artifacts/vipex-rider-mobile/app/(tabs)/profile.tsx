@@ -30,7 +30,7 @@ export default function ProfileScreen() {
       <Text style={[styles.eyebrow, { color: colors.mutedForeground, marginBottom: 9 }]}>RIDER DETAILS</Text>
       <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <DetailRow icon="phone" label="Phone number" value={user?.phone || 'Not provided'} colors={colors} />
-        <DetailRow icon="map-pin" label="Region" value="Greater Accra" colors={colors} />
+        <DetailRow icon="map-pin" label="Region" value={user?.region || 'Not provided'} colors={colors} />
         <DetailRow icon="truck" label="Vehicle" value="Motor Okada" colors={colors} />
       </View>
       <Pressable style={[styles.planButton, { backgroundColor: colors.yellowSoft, borderColor: colors.primary }]} onPress={() => router.push('/subscription')} testID="button-profile-subscription">
