@@ -7,6 +7,10 @@ export type RiderAccount = {
   name: string;
   phone: string;
   region: string;
+  vehicleType: string;
+  status: string;
+  subscriptionStatus: string;
+  isOnline: boolean;
   subscriptionActive?: boolean;
   subscriptionProvider?: string;
 };
@@ -14,7 +18,7 @@ export type RiderAccount = {
 type AuthContextValue = {
   user: RiderAccount | null;
   loading: boolean;
-  signIn: (account: Omit<RiderAccount, 'id'>) => Promise<void>;
+  saveRider: (rider: RiderAccount) => Promise<void>;
   signOut: () => Promise<void>;
   activateSubscription: (provider: string) => Promise<void>;
 };
@@ -24,11 +28,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readableSupabaseError(error: { message?: string } | null | undefined) {
   const message = error?.message || 'Supabase could not complete that request.';
-  if (message.toLowerCase().includes('anonymous')) {
-    return 'Supabase Anonymous Sign-Ins are not enabled yet. Enable them in Supabase Auth settings, then try again.';
+  const lowerMessage = message.toLowerCase();
+  if (lowerMessage.includes('relation') || lowerMessage.includes('riders')) {
+    return 'The riders table is not ready. Run supabase_schema.sql in your Supabase SQL Editor, then try again.';
   }
-  if (message.toLowerCase().includes('relation') || message.toLowerCase().includes('rider_profiles')) {
-    return 'The VIPEX rider tables are not ready. Run supabase_schema.sql in your Supabase SQL Editor, then try again.';
+  if (lowerMessage.includes('row-level security') || lowerMessage.includes('policy')) {
+    return 'Supabase is blocking this request. Run the anon riders policies from supabase_schema.sql, then try again.';
   }
   return message;
 }
@@ -44,30 +49,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (stored) {
           const account = JSON.parse(stored) as Partial<RiderAccount>;
           if (account.id && account.name && account.phone && account.region) {
-            setUser(account as RiderAccount);
-            return;
+            setUser({
+              vehicleType: account.vehicleType || 'Motor Okada',
+              status: account.status || 'pending_verification',
+              subscriptionStatus: account.subscriptionStatus || 'inactive',
+              isOnline: account.isOnline ?? false,
+              ...account,
+            } as RiderAccount);
+          } else {
+            await AsyncStorage.removeItem(ACCOUNT_KEY);
           }
-          await AsyncStorage.removeItem(ACCOUNT_KEY);
-        }
-
-        if (!supabase) return;
-        const { data: sessionData } = await supabase.auth.getSession();
-        const authUser = sessionData.session?.user;
-        if (!authUser) return;
-        const { data: profile } = await supabase
-          .from('rider_profiles')
-          .select('id, full_name, phone, region')
-          .eq('id', authUser.id)
-          .maybeSingle();
-        if (profile) {
-          const account = {
-            id: profile.id,
-            name: profile.full_name,
-            phone: profile.phone,
-            region: profile.region,
-          };
-          await AsyncStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
-          setUser(account);
         }
       } catch {
         await AsyncStorage.removeItem(ACCOUNT_KEY).catch(() => undefined);
@@ -83,57 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
-      signIn: async (account: Omit<RiderAccount, 'id'>) => {
-        if (!supabase) {
-          throw new Error('Supabase is not configured for this app.');
-        }
-
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw new Error(readableSupabaseError(sessionError));
-
-        let authUser = sessionData.session?.user;
-        if (!authUser) {
-          const anonymous = await supabase.auth.signInAnonymously();
-          if (anonymous.error || !anonymous.data.user) {
-            throw new Error(readableSupabaseError(anonymous.error));
-          }
-          authUser = anonymous.data.user;
-        }
-
-        const { data, error } = await supabase
-          .from('rider_profiles')
-          .upsert(
-            {
-              id: authUser.id,
-              full_name: account.name,
-              phone: account.phone,
-              region: account.region,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'id' },
-          )
-          .select('id, full_name, phone, region')
-          .single();
-
-        if (error || !data) throw new Error(readableSupabaseError(error));
-
-        const nextUser = {
-          id: data.id,
-          name: data.full_name,
-          phone: data.phone,
-          region: data.region,
-          subscriptionActive: false,
-        };
-        await AsyncStorage.setItem(ACCOUNT_KEY, JSON.stringify(nextUser));
-        setUser(nextUser);
+      saveRider: async (rider: RiderAccount) => {
+        await AsyncStorage.setItem(ACCOUNT_KEY, JSON.stringify(rider));
+        setUser(rider);
       },
       signOut: async () => {
-        if (supabase) await supabase.auth.signOut();
         await AsyncStorage.removeItem(ACCOUNT_KEY);
         setUser(null);
       },
       activateSubscription: async (provider: string) => {
-        if (!supabase || !user) throw new Error('Your rider session is not ready. Please sign in again.');
+        if (!supabase || !user) throw new Error('Your rider account is not ready. Please create an account again.');
         const expires = new Date();
         expires.setMonth(expires.getMonth() + 1);
         const { error } = await supabase.from('rider_subscriptions').upsert(
@@ -149,7 +99,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
         if (error) throw new Error(readableSupabaseError(error));
 
-        const nextUser = { ...user, subscriptionActive: true, subscriptionProvider: provider };
+        const nextUser = {
+          ...user,
+          subscriptionActive: true,
+          subscriptionProvider: provider,
+          subscriptionStatus: 'active',
+        };
         await AsyncStorage.setItem(ACCOUNT_KEY, JSON.stringify(nextUser));
         setUser(nextUser);
       },

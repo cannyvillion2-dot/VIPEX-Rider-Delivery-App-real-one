@@ -1,10 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 const logo = require('@/assets/images/vipex-logo.jpeg');
 const regions = [
@@ -26,17 +27,36 @@ const regions = [
   'Western North',
 ];
 
+type RiderRow = {
+  id: string;
+  full_name: string;
+  phone: string;
+  region: string;
+  vehicle_type: string;
+  status: string;
+  subscription_status: string;
+  is_online: boolean;
+};
+
 export default function AuthScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { signIn } = useAuth();
+  const { saveRider } = useAuth();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [vehicleType, setVehicleType] = useState('Motor Okada');
   const [region, setRegion] = useState('');
   const [regionPickerVisible, setRegionPickerVisible] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const createAccount = async () => {
+  const handleCreateAccount = async () => {
+    if (password !== confirmPassword) {
+      Alert.alert('Passwords dont match');
+      return;
+    }
     if (name.trim().length < 2) {
       setError('Enter your full name to continue.');
       return;
@@ -49,11 +69,57 @@ export default function AuthScreen() {
       setError('Choose your region to continue.');
       return;
     }
+    if (password.length < 6) {
+      setError('Choose a password with at least 6 characters.');
+      return;
+    }
+    if (!supabase) {
+      setError('Supabase is not configured for this app.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await signIn({ name: name.trim(), phone: phone.trim(), region });
-      router.replace('/(tabs)');
+      const { data, error: insertError } = await supabase
+        .from('riders')
+        .insert({
+          full_name: name.trim(),
+          phone: phone.trim(),
+          password,
+          region,
+          vehicle_type: vehicleType.trim() || 'Motor Okada',
+          status: 'pending_verification',
+          subscription_status: 'inactive',
+          is_online: false,
+        })
+        .select()
+        .single<RiderRow>();
+
+      if (insertError || !data) {
+        console.error(insertError);
+        Alert.alert('Error', insertError?.message || 'Could not create your rider account.');
+        return;
+      }
+
+      const rider = {
+        id: data.id,
+        name: data.full_name,
+        phone: data.phone,
+        region: data.region,
+        vehicleType: data.vehicle_type,
+        status: data.status,
+        subscriptionStatus: data.subscription_status,
+        isOnline: data.is_online,
+        subscriptionActive: data.subscription_status === 'active',
+      };
+      await saveRider(rider);
+      router.replace('/pending');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Account creation failed. Please try again.');
+      const message = cause instanceof Error ? cause.message : 'Account creation failed. Please try again.';
+      console.error(cause);
+      Alert.alert('Error', message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -91,6 +157,41 @@ export default function AuthScreen() {
             autoCorrect={false}
             testID="input-phone"
           />
+          <Text style={[styles.label, { color: colors.foreground }]}>Password</Text>
+          <TextInput
+            value={password}
+            onChangeText={(value) => { setPassword(value); setError(''); }}
+            placeholder="Create a password"
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            testID="input-password"
+          />
+          <Text style={[styles.label, { color: colors.foreground }]}>Confirm password</Text>
+          <TextInput
+            value={confirmPassword}
+            onChangeText={(value) => { setConfirmPassword(value); setError(''); }}
+            placeholder="Repeat your password"
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            testID="input-confirm-password"
+          />
+          <Text style={[styles.label, { color: colors.foreground }]}>Vehicle type</Text>
+          <TextInput
+            value={vehicleType}
+            onChangeText={(value) => { setVehicleType(value); setError(''); }}
+            placeholder="Motor Okada"
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+            autoCapitalize="words"
+            autoCorrect={false}
+            testID="input-vehicle-type"
+          />
           <Text style={[styles.label, { color: colors.foreground }]}>Region</Text>
           <Pressable
             onPress={() => setRegionPickerVisible(true)}
@@ -101,8 +202,8 @@ export default function AuthScreen() {
             <Feather name="chevron-down" size={17} color={colors.mutedForeground} />
           </Pressable>
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
-          <Pressable onPress={createAccount} style={({ pressed }) => [styles.button, { backgroundColor: colors.primary }, pressed && styles.pressed]} testID="button-create-account">
-            <Text style={[styles.buttonText, { color: colors.ink }]}>Create rider account</Text>
+          <Pressable onPress={handleCreateAccount} disabled={submitting} style={({ pressed }) => [styles.button, { backgroundColor: colors.primary }, pressed && styles.pressed, submitting && styles.disabled]} testID="button-create-account">
+            <Text style={[styles.buttonText, { color: colors.ink }]}>{submitting ? 'Creating account…' : 'Create rider account'}</Text>
             <Feather name="arrow-right" size={17} color={colors.ink} />
           </Pressable>
         </View>
@@ -153,6 +254,7 @@ const styles = StyleSheet.create({
   note: { borderRadius: 13, padding: 12, flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 'auto' },
   noteText: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 15 },
   pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
+  disabled: { opacity: 0.55 },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   regionModal: { maxHeight: '82%', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 19, paddingBottom: 22 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },

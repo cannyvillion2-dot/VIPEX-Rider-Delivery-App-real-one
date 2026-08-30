@@ -21,17 +21,17 @@ export default function ProfileScreen() {
       <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>YOUR RIDER PROFILE</Text>
       <View style={styles.profileRow}>
         <Image source={logo} style={styles.profileLogo} />
-        <View style={{ flex: 1 }}><Text style={[styles.title, { color: colors.foreground }]}>{riderName}</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>VIPEX rider since today</Text><View style={styles.verified}><Feather name="check-circle" size={13} color={colors.success} /><Text style={[styles.verifiedText, { color: colors.success }]}>Account active</Text></View></View>
+         <View style={{ flex: 1 }}><Text style={[styles.title, { color: colors.foreground }]}>{riderName}</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>VIPEX rider since today</Text><View style={styles.verified}><Feather name="check-circle" size={13} color={colors.success} /><Text style={[styles.verifiedText, { color: colors.success }]}>{user?.status === 'pending_verification' ? 'Pending verification' : 'Account active'}</Text></View></View>
       </View>
       <View style={[styles.statusCard, { backgroundColor: colors.charcoal }]}>
-        <View><Text style={[styles.cardEyebrow, { color: colors.mutedForeground }]}>RIDER STATUS</Text><Text style={[styles.statusTitle, { color: colors.primary }]}>Active & online</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>Ready to receive nearby assignments.</Text></View>
+         <View><Text style={[styles.cardEyebrow, { color: colors.mutedForeground }]}>RIDER STATUS</Text><Text style={[styles.statusTitle, { color: colors.primary }]}>{user?.status === 'pending_verification' ? 'Pending review' : 'Active & online'}</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>{user?.status === 'pending_verification' ? 'Your application is being reviewed.' : 'Ready to receive nearby assignments.'}</Text></View>
         <View style={[styles.onlinePill, { backgroundColor: colors.success }]}><View style={[styles.statusDot, { backgroundColor: colors.white }]} /><Text style={[styles.onlineText, { color: colors.white }]}>LIVE</Text></View>
       </View>
       <Text style={[styles.eyebrow, { color: colors.mutedForeground, marginBottom: 9 }]}>RIDER DETAILS</Text>
       <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <DetailRow icon="phone" label="Phone number" value={user?.phone || 'Not provided'} colors={colors} />
         <DetailRow icon="map-pin" label="Region" value={user?.region || 'Not provided'} colors={colors} />
-        <DetailRow icon="truck" label="Vehicle" value="Motor Okada" colors={colors} />
+         <DetailRow icon="truck" label="Vehicle" value={user?.vehicleType || 'Motor Okada'} colors={colors} />
       </View>
       <Pressable style={[styles.planButton, { backgroundColor: colors.yellowSoft, borderColor: colors.primary }]} onPress={() => router.push('/subscription')} testID="button-profile-subscription">
         <View style={[styles.planIcon, { backgroundColor: colors.primary }]}><Feather name="award" size={17} color={colors.ink} /></View>

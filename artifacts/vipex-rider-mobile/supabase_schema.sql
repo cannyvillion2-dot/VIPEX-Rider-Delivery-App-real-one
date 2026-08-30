@@ -1,19 +1,24 @@
 -- VIPEX Rider data model
 -- Run this once in the Supabase SQL Editor before using rider signup.
--- Anonymous sign-ins must also be enabled in Supabase Auth settings.
+-- This flow intentionally does not use Supabase Auth. It inserts with the anon key.
 
-create table if not exists public.rider_profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+create table if not exists public.riders (
+  id uuid primary key default gen_random_uuid(),
   full_name text not null,
   phone text not null,
+  password text not null,
   region text not null,
+  vehicle_type text not null default 'Motor Okada',
+  status text not null default 'pending_verification',
+  subscription_status text not null default 'inactive',
+  is_online boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create table if not exists public.rider_subscriptions (
   id uuid primary key default gen_random_uuid(),
-  rider_id uuid not null unique references public.rider_profiles(id) on delete cascade,
+  rider_id uuid not null unique references public.riders(id) on delete cascade,
   provider text not null check (provider in ('mtn', 'vodafone', 'airteltigo')),
   amount_ghs numeric(10, 2) not null default 20.00,
   status text not null check (status in ('active', 'pending', 'cancelled')),
@@ -22,37 +27,37 @@ create table if not exists public.rider_subscriptions (
   created_at timestamptz not null default now()
 );
 
-alter table public.rider_profiles enable row level security;
+alter table public.riders enable row level security;
 alter table public.rider_subscriptions enable row level security;
 
-drop policy if exists "Riders can read their own profile" on public.rider_profiles;
-create policy "Riders can read their own profile"
-  on public.rider_profiles for select
-  using (auth.uid() = id);
+drop policy if exists "Allow anon insert riders" on public.riders;
+create policy "Allow anon insert riders"
+  on public.riders for insert to anon
+  with check (true);
 
-drop policy if exists "Riders can create their own profile" on public.rider_profiles;
-create policy "Riders can create their own profile"
-  on public.rider_profiles for insert
-  with check (auth.uid() = id);
+drop policy if exists "Allow anon read riders" on public.riders;
+create policy "Allow anon read riders"
+  on public.riders for select to anon
+  using (true);
 
-drop policy if exists "Riders can update their own profile" on public.rider_profiles;
-create policy "Riders can update their own profile"
-  on public.rider_profiles for update
-  using (auth.uid() = id)
-  with check (auth.uid() = id);
+drop policy if exists "Allow anon update riders" on public.riders;
+create policy "Allow anon update riders"
+  on public.riders for update to anon
+  using (true)
+  with check (true);
 
-drop policy if exists "Riders can read their own subscription" on public.rider_subscriptions;
-create policy "Riders can read their own subscription"
-  on public.rider_subscriptions for select
-  using (auth.uid() = rider_id);
+drop policy if exists "Allow anon insert rider subscriptions" on public.rider_subscriptions;
+create policy "Allow anon insert rider subscriptions"
+  on public.rider_subscriptions for insert to anon
+  with check (true);
 
-drop policy if exists "Riders can create their own subscription" on public.rider_subscriptions;
-create policy "Riders can create their own subscription"
-  on public.rider_subscriptions for insert
-  with check (auth.uid() = rider_id);
+drop policy if exists "Allow anon read rider subscriptions" on public.rider_subscriptions;
+create policy "Allow anon read rider subscriptions"
+  on public.rider_subscriptions for select to anon
+  using (true);
 
-drop policy if exists "Riders can update their own subscription" on public.rider_subscriptions;
-create policy "Riders can update their own subscription"
-  on public.rider_subscriptions for update
-  using (auth.uid() = rider_id)
-  with check (auth.uid() = rider_id);
+drop policy if exists "Allow anon update rider subscriptions" on public.rider_subscriptions;
+create policy "Allow anon update rider subscriptions"
+  on public.rider_subscriptions for update to anon
+  using (true)
+  with check (true);
