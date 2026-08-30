@@ -35,7 +35,7 @@ export default function ProfileScreen() {
       </View>
       <Pressable style={[styles.planButton, { backgroundColor: colors.yellowSoft, borderColor: colors.primary }]} onPress={() => router.push('/subscription')} testID="button-profile-subscription">
         <View style={[styles.planIcon, { backgroundColor: colors.primary }]}><Feather name="award" size={17} color={colors.ink} /></View>
-        <View style={{ flex: 1 }}><Text style={[styles.planTitle, { color: colors.foreground }]}>VIPEX Rider plan</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>Active until 18 July 2024</Text></View>
+        <View style={{ flex: 1 }}><Text style={[styles.planTitle, { color: colors.foreground }]}>VIPEX Rider plan</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>{user?.subscriptionActive ? `Active · ${user.subscriptionProvider || 'Mobile Money'}` : 'Set up your monthly rider plan'}</Text></View>
         <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
       </Pressable>
       <Pressable style={styles.logout} onPress={() => { void signOut(); router.replace('/auth'); }} testID="button-logout"><Feather name="log-out" size={16} color={colors.destructive} /><Text style={[styles.logoutText, { color: colors.destructive }]}>Log out</Text></Pressable>

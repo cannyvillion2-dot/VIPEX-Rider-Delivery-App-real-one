@@ -49,8 +49,12 @@ export default function AuthScreen() {
       setError('Choose your region to continue.');
       return;
     }
-    await signIn({ name: name.trim(), phone: phone.trim(), region });
-    router.replace('/(tabs)');
+    try {
+      await signIn({ name: name.trim(), phone: phone.trim(), region });
+      router.replace('/(tabs)');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Account creation failed. Please try again.');
+    }
   };
 
   return (

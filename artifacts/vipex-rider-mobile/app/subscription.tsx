@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { useAuth } from '@/context/AuthContext';
 
 const logo = require('@/assets/images/vipex-logo.jpeg');
 const providers = [
@@ -16,12 +17,24 @@ const providers = [
 export default function SubscriptionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user, activateSubscription } = useAuth();
   const [selected, setSelected] = useState('mtn');
   const [activated, setActivated] = useState(false);
+  const [error, setError] = useState('');
 
-  const activate = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setActivated(true);
+  const activate = async () => {
+    if (!user) {
+      setError('Your rider account is not ready. Please sign in again.');
+      return;
+    }
+    try {
+      await activateSubscription(selected);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setActivated(true);
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Subscription activation failed. Please try again.');
+    }
   };
 
   return (
@@ -50,6 +63,7 @@ export default function SubscriptionScreen() {
         </View>
         <Pressable onPress={activate} disabled={activated} style={({ pressed }) => [styles.payButton, { backgroundColor: activated ? colors.success : colors.primary }, pressed && styles.pressed]} testID="button-pay-mobile-money"><Feather name={activated ? 'check-circle' : 'smartphone'} size={18} color={activated ? colors.white : colors.ink} /><Text style={[styles.payText, { color: activated ? colors.white : colors.ink }]}>{activated ? 'Plan active' : 'Pay GH₵ 20 with Mobile Money'}</Text></Pressable>
         <View style={styles.secure}><Feather name="lock" size={13} color={colors.mutedForeground} /><Text style={[styles.secureText, { color: colors.mutedForeground }]}>Secure payment · {providers.find((provider) => provider.id === selected)?.name}</Text></View>
+        {error ? <View style={[styles.errorBanner, { backgroundColor: colors.card, borderColor: colors.destructive }]}><Feather name="alert-circle" size={15} color={colors.destructive} /><Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text></View> : null}
         {activated && <View style={[styles.successBanner, { backgroundColor: colors.yellowSoft }]}><Feather name="check" size={15} color={colors.success} /><Text style={[styles.successText, { color: colors.foreground }]}>You’re activated. Welcome to the VIPEX fleet.</Text></View>}
       </ScrollView>
     </View>
@@ -92,5 +106,7 @@ const styles = StyleSheet.create({
   secureText: { fontFamily: 'Inter_400Regular', fontSize: 9 },
   successBanner: { borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 14 },
   successText: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 10 },
+  errorBanner: { borderRadius: 12, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: 14 },
+  errorText: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 10, lineHeight: 15 },
   pressed: { opacity: 0.74, transform: [{ scale: 0.98 }] },
 });
