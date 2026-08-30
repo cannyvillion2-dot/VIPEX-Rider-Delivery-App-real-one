@@ -1,0 +1,40 @@
+Build VIPEX DELIVERY Rider Mobile App - React Vite + Tailwind + Supabase - EXACT UI from reference image
+
+SUPABASE CONFIG (same brain as Admin Portal):
+URL: https://ekgtacwhymbbgdonhbnx.supabase.co
+ANON KEY: sb_publishable_b-1Kz148a3L3CCUkIXfAEw_GBF_WpSY
+
+DESIGN COLORS & UI - MUST MATCH REFERENCE IMAGE EXACTLY:
+- Colors: Primary Yellow #FFD60A, Black #000000, White #FFFFFF, Light Gray #F5F5F5
+- Top Header: White pill card with VD yellow circle logo, "Hi Rider," bold black, subtitle "Track your deliveries in real time" gray, bell icon right
+- Shipment Card: Bright yellow rounded 24px, "• Shipment in transit" pill with black border, big bold "VIPEX-7821-XL", "Arriving today • 4:25 PM" small, "78% to destination" with black progress bar on light yellow track
+- Action Buttons: 5 buttons in one row, white background, black thin border, rounded 12px, black icons: Sent (paper plane), Support (headset), Profile (person), Subscription (crown), New Assignment (briefcase)
+- Live Tracking: White card with "Live tracking" title and green dot "• Live", map with light gray buildings, black thick line from Pickup pin to Destination pin, yellow scooter icon in middle moving
+- Bottom Nav: White floating pill bar with 3 items only: Home (yellow active with house icon), Analytics (chart icon), Profile (person icon) - NO Shipments, NO Scan
+- Mobile first 390px centered, all screens clean minimal for Ghana okada riders, lucide-react icons
+
+FEATURE 1 - AUTHENTICATION (Riders create OWN password):
+- Sign Up Screen: Yellow VD logo top, "Join VIPEX" title, fields: Full Name, Phone Number (Ghana +233), Create Password, Confirm Password, Region dropdown (16 Ghana regions: Greater Accra, Ashanti, Western, etc), Vehicle Type (Motor Okada / Bicycle / Car / Van). Big black button yellow text "Create Account". On submit: hash check passwords match, insert into Supabase 'riders' table: {full_name, phone, password, region, vehicle_type, status='pending_verification', is_online=false, subscription_status='inactive', created_at=now()}. Then go to Pending Screen.
+- Login Screen: Phone + Password, "Forgot password?" link, Black button "Login". Check riders table where phone and password match. If status is pending_verification -> Pending Screen, if approved but subscription inactive -> Subscription Screen, if approved and active -> Dashboard.
+- Pending Verification Screen: White background, pulsing yellow dot, "Waiting for verification" title, "Your account is being reviewed by VIPEX HQ in Greater Accra. You'll be notified instantly after approval." + spinner. Poll Supabase every 3 seconds: supabase.from('riders').select('status').eq('id', riderId). If status changes to 'approved', auto navigate. Also listen with Supabase Realtime channel on riders table.
+- This connects to Admin Web App: Admin sees rider instantly in Riders page with red dot notification because same Supabase project ekgtacwhymbbgdonhbnx.
+
+FEATURE 2 - MONTHLY SUBSCRIPTION 20 GHS:
+- Subscription Screen: After admin approval but before dashboard. Title "Activate Your Rider Account", Show crown icon yellow, "Monthly Subscription - 20 GHS / month", Features list: Unlimited deliveries, Real-time tracking, Instant payouts, 24/7 support. Payment button "Pay 20 GHS with Mobile Money" (simulate for now: MTN MoMo, Vodafone Cash, AirtelTigo). On click, update riders table set subscription_status='active', subscription_start=now(), subscription_end=now()+30days, insert into subscriptions table. Then go to Dashboard. If subscription expires, block dashboard and show renewal screen.
+- Subscription tab in Dashboard also shows status, expiry date, renew button.
+
+FEATURE 3 - DASHBOARD (only if approved + subscription active):
+- Header shows rider name and region badge
+- Top Yellow Shipment Card shows current active delivery from orders table where rider_id = me and status != 'delivered'
+- Action Buttons work: Sent -> shows delivered orders, Support -> WhatsApp link, Profile -> rider profile, Subscription -> subscription status, New Assignment -> available jobs
+- Live Tracking map updates in real time
+- Online/Offline toggle updates is_online in Supabase
+- Bottom Nav: Home (this dashboard), Analytics (earnings chart, total deliveries, rating), Profile (logout, edit details, vehicle info)
+
+DATABASE TABLES TO USE/CREATE:
+- riders: id, full_name, phone, password, region, vehicle_type, status (pending_verification/approved/rejected), is_online, subscription_status, created_at
+- orders: id, order_code like VIPEX-XXXX-XL, pickup_location, drop_location, status (ready_for_pickup/assigned/picked_up/in_transit/delivered), rider_id nullable, region, price, created_at
+- subscriptions: id, rider_id, amount 20, status, start_date, end_date
+- Use Supabase Realtime for instant admin notification
+
+Build as Vite React app, install all dependencies, run npm run dev, make it deploy ready on Replit. Make auth work with Supabase directly. PWA ready.
