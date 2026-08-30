@@ -3,12 +3,15 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { router } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 
 const logo = require('@/assets/images/vipex-logo.jpeg');
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user, signOut } = useAuth();
+  const riderName = user?.name || 'VIPEX Rider';
   return (
     <ScrollView
       style={{ backgroundColor: colors.background }}
@@ -18,7 +21,7 @@ export default function ProfileScreen() {
       <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>YOUR RIDER PROFILE</Text>
       <View style={styles.profileRow}>
         <Image source={logo} style={styles.profileLogo} />
-        <View style={{ flex: 1 }}><Text style={[styles.title, { color: colors.foreground }]}>Kwame Asante</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>VIPEX rider since March 2024</Text><View style={styles.verified}><Feather name="check-circle" size={13} color={colors.success} /><Text style={[styles.verifiedText, { color: colors.success }]}>Verified rider</Text></View></View>
+        <View style={{ flex: 1 }}><Text style={[styles.title, { color: colors.foreground }]}>{riderName}</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>VIPEX rider since today</Text><View style={styles.verified}><Feather name="check-circle" size={13} color={colors.success} /><Text style={[styles.verifiedText, { color: colors.success }]}>Account active</Text></View></View>
       </View>
       <View style={[styles.statusCard, { backgroundColor: colors.charcoal }]}>
         <View><Text style={[styles.cardEyebrow, { color: colors.mutedForeground }]}>RIDER STATUS</Text><Text style={[styles.statusTitle, { color: colors.primary }]}>Active & online</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>Ready to receive nearby assignments.</Text></View>
@@ -26,7 +29,7 @@ export default function ProfileScreen() {
       </View>
       <Text style={[styles.eyebrow, { color: colors.mutedForeground, marginBottom: 9 }]}>RIDER DETAILS</Text>
       <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <DetailRow icon="phone" label="Phone number" value="+233 24 000 0000" colors={colors} />
+        <DetailRow icon="phone" label="Phone number" value={user?.phone || 'Not provided'} colors={colors} />
         <DetailRow icon="map-pin" label="Region" value="Greater Accra" colors={colors} />
         <DetailRow icon="truck" label="Vehicle" value="Motor Okada" colors={colors} />
       </View>
@@ -35,7 +38,7 @@ export default function ProfileScreen() {
         <View style={{ flex: 1 }}><Text style={[styles.planTitle, { color: colors.foreground }]}>VIPEX Rider plan</Text><Text style={[styles.copy, { color: colors.mutedForeground }]}>Active until 18 July 2024</Text></View>
         <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
       </Pressable>
-      <Pressable style={styles.logout} onPress={() => router.replace('/')} testID="button-logout"><Feather name="log-out" size={16} color={colors.destructive} /><Text style={[styles.logoutText, { color: colors.destructive }]}>Log out</Text></Pressable>
+      <Pressable style={styles.logout} onPress={() => { void signOut(); router.replace('/auth'); }} testID="button-logout"><Feather name="log-out" size={16} color={colors.destructive} /><Text style={[styles.logoutText, { color: colors.destructive }]}>Log out</Text></Pressable>
       <Text style={[styles.footer, { color: colors.mutedForeground }]}>VIPEX PARCEL DELIVERY · GREATER ACCRA</Text>
     </ScrollView>
   );
