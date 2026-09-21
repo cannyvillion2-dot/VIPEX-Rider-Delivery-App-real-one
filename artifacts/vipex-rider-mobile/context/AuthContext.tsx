@@ -16,6 +16,9 @@ export type RiderAccount = {
 type AuthContextValue = {
   user: RiderAccount | null;
   loading: boolean;
+  profileError: string | null;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (input: { email: string; password: string; name: string; phone: string }) => Promise<boolean>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   sessionExpired: boolean;
@@ -41,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<RiderAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -61,7 +65,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           break;
         }
       }
-      if (mounted) setUser(mapProfile(row ?? {}, authUser));
+      if (mounted) {
+        if (!row) {
+          setUser(null);
+          setProfileError('This account is not linked to an approved SwiftDelivery rider profile.');
+        } else {
+          setProfileError(null);
+          setUser(mapProfile(row, authUser));
+        }
+      }
     };
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) return loadProfile(data.session.user);
@@ -75,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void loadProfile(nextSession.user).finally(() => mounted && setLoading(false));
       } else {
         setUser(null);
+        if (event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') setProfileError(null);
         setLoading(false);
       }
     });
@@ -88,6 +101,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
+      profileError,
+      signIn: async (email: string, password: string) => {
+        if (!supabase) throw new Error('SwiftPex Supabase is not configured.');
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) throw new Error(error.message);
+      },
+      signUp: async ({ email, password, name, phone }) => {
+        if (!supabase) throw new Error('SwiftPex Supabase is not configured.');
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { full_name: name.trim(), phone: phone.trim(), app_role: 'rider' } },
+        });
+        if (error) throw new Error(error.message);
+        if (!data.session) return false;
+        return true;
+      },
       signOut: async () => {
         await supabase?.auth.signOut();
         setUser(null);
@@ -96,11 +126,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data } = await supabase?.auth.getUser() ?? { data: { user: null } };
         if (!data.user) return;
         const result = await supabase?.from('riders').select('*').eq('user_id', data.user.id).maybeSingle();
-        if (result?.data) setUser(mapProfile(result.data as Record<string, unknown>, data.user));
+        if (result?.data) {
+          setProfileError(null);
+          setUser(mapProfile(result.data as Record<string, unknown>, data.user));
+        }
       },
       sessionExpired,
     }),
-    [loading, sessionExpired, user],
+    [loading, profileError, sessionExpired, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -75,7 +75,7 @@ export async function listJobs(): Promise<DeliveryJob[]> {
   try {
     return rows(await rpc('rider_get_jobs')).map(mapJob).filter((job) => job.id);
   } catch (rpcError) {
-    const { data, error } = await requireClient().from('delivery_jobs').select('*').order('created_at', { ascending: false });
+    const { data, error } = await requireClient().from('delivery_jobs').select('*, orders(*)').order('created_at', { ascending: false });
     if (error) throw new Error(rpcError instanceof Error ? `${rpcError.message} (${error.message})` : error.message);
     return (data ?? []).map(mapJob).filter((job) => job.id);
   }
@@ -111,15 +111,28 @@ export async function requestWithdrawal(amount: number, provider: string, accoun
   return rpc('rider_request_withdrawal', { p_amount: amount, p_provider: provider, p_account: account });
 }
 export async function getWithdrawals(): Promise<Withdrawal[]> {
-  return rows(await rpc('rider_get_withdrawals')).map((value) => {
-    const row = asRecord(value);
-    return { id: text(row, 'id'), amount: Number(row.amount ?? 0), status: text(row, 'status'), createdAt: text(row, 'created_at'), provider: text(row, 'provider') };
-  });
+  try {
+    return rows(await rpc('rider_get_withdrawals')).map((value) => {
+      const row = asRecord(value);
+      return { id: text(row, 'id'), amount: Number(row.amount ?? 0), status: text(row, 'status'), createdAt: text(row, 'created_at'), provider: text(row, 'provider') };
+    });
+  } catch {
+    const { data, error } = await requireClient().from('withdrawal_requests').select('*').order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((value) => {
+      const row = asRecord(value);
+      return { id: text(row, 'id'), amount: Number(row.amount ?? 0), status: text(row, 'status'), createdAt: text(row, 'created_at'), provider: text(row, 'provider') };
+    });
+  }
 }
 export async function getNotifications(): Promise<RiderNotification[]> {
-  return rows(await rpc('rider_get_notifications')).map((value) => {
-    const row = asRecord(value);
-    return { id: text(row, 'id'), title: text(row, 'title'), body: text(row, 'body', 'message'), read: Boolean(row.read ?? row.is_read), createdAt: text(row, 'created_at') };
-  });
+  try {
+    return rows(await rpc('rider_get_notifications')).map((value) => {
+      const row = asRecord(value);
+      return { id: text(row, 'id'), title: text(row, 'title'), body: text(row, 'body', 'message'), read: Boolean(row.read ?? row.is_read), createdAt: text(row, 'created_at') };
+    });
+  } catch {
+    throw new Error('Notifications are not available in the verified live rider schema.');
+  }
 }
 export async function markNotificationRead(id: string) { return rpc('rider_mark_notification_read', { p_notification_id: id }); }
