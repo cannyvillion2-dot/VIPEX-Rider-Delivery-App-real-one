@@ -36,15 +36,10 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerBackTitle: 'Back', headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
-      <Stack.Screen name="pending" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="subscription"
-        options={{
-          presentation: 'card',
-          animation: 'slide_from_bottom',
-          headerShown: false,
-        }}
-      />
+      <Stack.Screen name="jobs" options={{ headerShown: false }} />
+      <Stack.Screen name="job/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ headerShown: false }} />
+      <Stack.Screen name="settings" options={{ headerShown: false }} />
     </Stack>
   );
 }

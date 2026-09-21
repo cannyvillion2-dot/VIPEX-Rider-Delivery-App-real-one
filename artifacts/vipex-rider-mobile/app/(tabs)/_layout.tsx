@@ -21,7 +21,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="analytics">
         <Icon sf={{ default: 'chart.bar', selected: 'chart.bar.fill' }} />
-        <Label>Analytics</Label>
+        <Label>Earnings</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: 'person', selected: 'person.fill' }} />
@@ -86,7 +86,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="analytics"
         options={{
-          title: 'Analytics',
+          title: 'Earnings',
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="chart.bar" tintColor={color} size={23} />

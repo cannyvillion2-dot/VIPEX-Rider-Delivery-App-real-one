@@ -5,8 +5,8 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabase =
-  supabaseUrl && supabasePublishableKey
-    ? createClient(supabaseUrl, supabasePublishableKey, {
+  (supabaseUrl || 'https://swiftpex-gh1.supabase.co') && supabasePublishableKey
+    ? createClient(supabaseUrl || 'https://swiftpex-gh1.supabase.co', supabasePublishableKey, {
         auth: {
           storage: AsyncStorage,
           autoRefreshToken: true,

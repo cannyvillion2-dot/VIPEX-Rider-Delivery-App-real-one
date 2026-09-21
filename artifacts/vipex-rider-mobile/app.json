@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "VIPEX Rider Mobile",
-    "slug": "vipex-rider-mobile",
+    "name": "SwiftDelivery",
+    "slug": "swift-delivery",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "vipex-rider-mobile",
+    "scheme": "swift-delivery",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
