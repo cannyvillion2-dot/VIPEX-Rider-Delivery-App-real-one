@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://swiftpex-gh1.supabase.co';
 const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabase =
-  (supabaseUrl || 'https://swiftpex-gh1.supabase.co') && supabasePublishableKey
-    ? createClient(supabaseUrl || 'https://swiftpex-gh1.supabase.co', supabasePublishableKey, {
+  supabaseUrl && supabasePublishableKey
+    ? createClient(supabaseUrl, supabasePublishableKey, {
         auth: {
           storage: AsyncStorage,
           autoRefreshToken: true,

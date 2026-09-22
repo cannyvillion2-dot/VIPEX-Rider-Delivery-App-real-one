@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export type RiderAccount = {
@@ -53,10 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     let mounted = true;
     const loadProfile = async (authUser: { id: string; email?: string | null }) => {
+      const client = supabase;
+      if (!client) return;
+      const userResult = await client.from('users').select('*').eq('id', authUser.id).maybeSingle();
+      const userRow = (userResult.data ?? {}) as Record<string, unknown>;
+      const riderId = String(userRow.rider_id ?? '');
       const attempts = [
-        supabase.from('riders').select('*').eq('user_id', authUser.id).maybeSingle(),
-        supabase.from('riders').select('*').eq('id', authUser.id).maybeSingle(),
-      ];
+        riderId ? client.from('riders').select('*').eq('id', riderId).maybeSingle() : null,
+        client.from('riders').select('*').eq('user_id', authUser.id).maybeSingle(),
+        client.from('riders').select('*').eq('auth_user_id', authUser.id).maybeSingle(),
+      ].filter(Boolean) as Array<ReturnType<typeof client.from>>;
       let row: Record<string, unknown> | null = null;
       for (const attempt of attempts) {
         const result = await attempt;
@@ -66,7 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       if (mounted) {
-        if (!row) {
+        const role = String(userRow.role ?? userRow.user_role ?? userRow.account_type ?? '').toLowerCase();
+        const blocked = ['disabled', 'suspended', 'rejected', 'inactive'].includes(String(row?.status ?? '').toLowerCase());
+        if (!row || role && role !== 'rider' || blocked) {
           setUser(null);
           setProfileError('This account is not linked to an approved SwiftDelivery rider profile.');
         } else {
@@ -75,13 +83,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     };
+    const hadSession = { current: false };
     void supabase.auth.getSession().then(({ data }) => {
+      hadSession.current = Boolean(data.session);
       if (data.session?.user) return loadProfile(data.session.user);
       setLoading(false);
     }).finally(() => mounted && setLoading(false));
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
-      setSessionExpired(event === 'TOKEN_REFRESHED' && !nextSession);
+      if (nextSession) hadSession.current = true;
+      setSessionExpired(!nextSession && hadSession.current && event !== 'INITIAL_SESSION');
       if (nextSession?.user) {
         setLoading(true);
         void loadProfile(nextSession.user).finally(() => mounted && setLoading(false));
@@ -107,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw new Error(error.message);
       },
-      signUp: async ({ email, password, name, phone }) => {
+      signUp: async ({ email, password, name, phone }: { email: string; password: string; name: string; phone: string }) => {
         if (!supabase) throw new Error('SwiftPex Supabase is not configured.');
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
