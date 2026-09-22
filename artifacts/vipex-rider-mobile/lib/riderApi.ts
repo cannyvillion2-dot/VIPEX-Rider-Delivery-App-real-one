@@ -16,123 +16,106 @@ export type DeliveryJob = {
   recipientName: string;
   recipientPhone: string;
   notes: string;
-  riderFee: number | null;
+  productCode: string;
+  orderId: string;
+  statusHistory: Array<{ status: DeliveryStatus; createdAt: string | null }>;
   createdAt: string | null;
   updatedAt: string | null;
 };
 
-export type Earnings = { available: number; pending: number; paid: number; total: number; deliveries: number; currency: string };
-export type Withdrawal = { id: string; amount: number; status: string; createdAt: string; provider: string };
-export type RiderNotification = { id: string; title: string; body: string; read: boolean; createdAt: string };
+export type RiderNotification = {
+  id: string;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+};
 
-function requireClient() {
+function client() {
   if (!supabase) throw new Error('SwiftPex Supabase is not configured.');
   return supabase;
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
+function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {};
 }
+
 function text(row: Record<string, unknown>, ...keys: string[]) {
   const value = keys.map((key) => row[key]).find((item) => item !== null && item !== undefined);
   return value == null ? '' : String(value);
 }
-function money(row: Record<string, unknown>, ...keys: string[]) {
-  const value = keys.map((key) => row[key]).find((item) => item !== null && item !== undefined);
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
+
 function mapJob(input: unknown): DeliveryJob {
-  const row = asRecord(input);
+  const row = record(input);
+  const order = record(row.orders);
+  const history = Array.isArray(row.delivery_status_history) ? row.delivery_status_history : [];
   return {
     id: text(row, 'id', 'job_id'),
-    reference: text(row, 'reference', 'job_number', 'order_number', 'tracking_number') || 'Delivery job',
+    reference: text(row, 'reference', 'job_number', 'order_number', 'tracking_number') ||
+      text(order, 'order_number', 'tracking_number') || 'Delivery job',
     status: text(row, 'status', 'job_status').toUpperCase() as DeliveryStatus,
-    pickupAddress: text(row, 'pickup_address', 'pickup_location', 'origin_address', 'pickup'),
-    destinationAddress: text(row, 'delivery_address', 'destination_address', 'dropoff_address', 'destination'),
-    recipientName: text(row, 'recipient_name', 'customer_name', 'consignee_name'),
-    recipientPhone: text(row, 'recipient_phone', 'customer_phone', 'consignee_phone'),
-    notes: text(row, 'notes', 'delivery_notes', 'special_instructions'),
-    riderFee: money(row, 'rider_fee', 'rider_earnings', 'delivery_fee'),
+    pickupAddress: text(row, 'pickup_address', 'pickup_location', 'origin_address', 'pickup') ||
+      text(order, 'pickup_address', 'origin_address'),
+    destinationAddress: text(row, 'delivery_address', 'dropoff_address', 'destination') ||
+      text(order, 'delivery_address', 'destination_address'),
+    recipientName: text(row, 'recipient_name', 'customer_name', 'consignee_name') ||
+      text(order, 'recipient_name', 'customer_name'),
+    recipientPhone: text(row, 'recipient_phone', 'customer_phone', 'consignee_phone') ||
+      text(order, 'recipient_phone', 'customer_phone'),
+    notes: text(row, 'notes', 'delivery_notes', 'special_instructions') ||
+      text(order, 'notes', 'delivery_notes'),
+    productCode: text(row, 'product_code', 'productCode', 'sku') ||
+      text(order, 'product_code', 'productCode', 'sku'),
+    orderId: text(row, 'order_id') || text(order, 'id'),
+    statusHistory: history.map((item) => {
+      const event = record(item);
+      return {
+        status: text(event, 'status', 'delivery_status').toUpperCase() as DeliveryStatus,
+        createdAt: text(event, 'created_at') || null,
+      };
+    }),
     createdAt: text(row, 'created_at') || null,
     updatedAt: text(row, 'updated_at') || null,
   };
 }
-async function rpc<T>(name: string, args: Record<string, unknown> = {}) {
-  const client = requireClient();
-  const result = await client.rpc(name, args);
+
+async function rpc<T>(name: string, args: Record<string, unknown>) {
+  const result = await client().rpc(name, args);
   if (result.error) throw new Error(result.error.message);
   return result.data as T;
 }
-function rows(data: unknown): unknown[] {
-  if (Array.isArray(data)) return data;
-  const record = asRecord(data);
-  for (const key of ['jobs', 'data', 'items', 'notifications', 'withdrawals']) if (Array.isArray(record[key])) return record[key] as unknown[];
-  return data ? [data] : [];
-}
 
 export async function listJobs(): Promise<DeliveryJob[]> {
-  try {
-    return rows(await rpc('rider_get_jobs')).map(mapJob).filter((job) => job.id);
-  } catch (rpcError) {
-    const { data, error } = await requireClient().from('delivery_jobs').select('*, orders(*)').order('created_at', { ascending: false });
-    if (error) throw new Error(rpcError instanceof Error ? `${rpcError.message} (${error.message})` : error.message);
-    return (data ?? []).map(mapJob).filter((job) => job.id);
-  }
+  const { data, error } = await client()
+    .from('delivery_jobs')
+    .select('*, orders(*), delivery_status_history(*)')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapJob).filter((job) => job.id);
 }
-export async function getJob(id: string) {
-  try {
-    return mapJob(await rpc('rider_get_job', { p_job_id: id }));
-  } catch {
-    const { data, error } = await requireClient().from('delivery_jobs').select('*').eq('id', id).single();
-    if (error) throw new Error(error.message);
-    return mapJob(data);
-  }
+
+export async function getJob(id: string): Promise<DeliveryJob> {
+  const { data, error } = await client()
+    .from('delivery_jobs')
+    .select('*, orders(*), delivery_status_history(*)')
+    .eq('id', id)
+    .single();
+  if (error) throw new Error(error.message);
+  return mapJob(data);
 }
-export async function acceptJob(id: string) { return rpc('rider_accept_job', { p_job_id: id }); }
-export async function updateJobStatus(id: string, status: DeliveryStatus, proofUrl?: string) {
-  return rpc('rider_update_delivery_status', { p_job_id: id, p_status: status, p_proof_url: proofUrl ?? null });
+
+export async function acceptJob(id: string) {
+  return rpc<unknown>('accept_delivery_job', { p_job_id: id });
 }
-export async function confirmPickup(id: string) { return updateJobStatus(id, 'PICKED_UP'); }
-export async function confirmDelivery(id: string, proofUrl?: string) { return updateJobStatus(id, 'DELIVERED', proofUrl); }
-export async function setOnline(isOnline: boolean) { return rpc('rider_set_online', { p_is_online: isOnline }); }
-export async function getEarnings(): Promise<Earnings> {
-  const data = asRecord(await rpc('rider_get_earnings'));
-  return {
-    available: Number(data.available ?? data.available_balance ?? 0),
-    pending: Number(data.pending ?? data.pending_balance ?? 0),
-    paid: Number(data.paid ?? data.paid_total ?? 0),
-    total: Number(data.total ?? data.total_earnings ?? 0),
-    deliveries: Number(data.deliveries ?? data.completed_deliveries ?? 0),
-    currency: text(data, 'currency') || 'GHS',
-  };
+
+export async function updateJobStatus(id: string, status: DeliveryStatus) {
+  return rpc<unknown>('update_delivery_job_status', { p_job_id: id, p_status: status });
 }
-export async function requestWithdrawal(amount: number, provider: string, account: string) {
-  return rpc('rider_request_withdrawal', { p_amount: amount, p_provider: provider, p_account: account });
-}
-export async function getWithdrawals(): Promise<Withdrawal[]> {
-  try {
-    return rows(await rpc('rider_get_withdrawals')).map((value) => {
-      const row = asRecord(value);
-      return { id: text(row, 'id'), amount: Number(row.amount ?? 0), status: text(row, 'status'), createdAt: text(row, 'created_at'), provider: text(row, 'provider') };
-    });
-  } catch {
-    const { data, error } = await requireClient().from('withdrawal_requests').select('*').order('created_at', { ascending: false });
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((value) => {
-      const row = asRecord(value);
-      return { id: text(row, 'id'), amount: Number(row.amount ?? 0), status: text(row, 'status'), createdAt: text(row, 'created_at'), provider: text(row, 'provider') };
-    });
-  }
-}
+
 export async function getNotifications(): Promise<RiderNotification[]> {
-  try {
-    return rows(await rpc('rider_get_notifications')).map((value) => {
-      const row = asRecord(value);
-      return { id: text(row, 'id'), title: text(row, 'title'), body: text(row, 'body', 'message'), read: Boolean(row.read ?? row.is_read), createdAt: text(row, 'created_at') };
-    });
-  } catch {
-    throw new Error('Notifications are not available in the verified live rider schema.');
-  }
+  throw new Error('Notifications are not available in the verified live rider schema.');
 }
-export async function markNotificationRead(id: string) { return rpc('rider_mark_notification_read', { p_notification_id: id }); }
+
+export async function markNotificationRead(_id: string) {
+  throw new Error('Notifications are not available in the verified live rider schema.');
+}
